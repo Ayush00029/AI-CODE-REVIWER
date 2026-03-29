@@ -38,7 +38,7 @@ export default function App() {
     setIsReviewing(true);
 
     try {
-      const response = await axios.post('http://localhost:5000/review', {
+      const response = await axios.post(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/review`, {
         code,
         language
       });
