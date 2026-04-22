@@ -22,7 +22,7 @@ app.post('/review', async (req, res) => {
       return res.status(400).json({ error: 'Code is required' });
     }
 
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
     const prompt = `
 Act as a senior software engineer and perform a professional code review.
@@ -43,7 +43,19 @@ Language:
 ${language || 'auto'}
 `;
 
-    const result = await model.generateContent(prompt);
+    let result;
+    try {
+      result = await model.generateContent(prompt);
+    } catch (apiError) {
+      if (apiError.message && (apiError.message.includes('503') || apiError.message.includes('unavailable'))) {
+        console.log('API returned 503, retrying in 2 seconds...');
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        result = await model.generateContent(prompt);
+      } else {
+        throw apiError;
+      }
+    }
+
     const response = await result.response;
     const text = response.text();
 

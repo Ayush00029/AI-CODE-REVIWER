@@ -47,7 +47,11 @@ export default function App() {
     } catch (err) {
       console.error(err);
       const backendError = err.response?.data?.error || err.message;
-      setError(`Failed to get review: ${backendError}`);
+      if (typeof backendError === 'string' && (backendError.includes('503') || backendError.toLowerCase().includes('unavailable') || backendError.includes('high demand'))) {
+        setError('Service is temporarily busy. Please wait a moment and try again.');
+      } else {
+        setError(`Failed to get review: ${backendError}`);
+      }
     } finally {
       setIsReviewing(false);
     }
