@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Editor from '@monaco-editor/react';
 import ReactMarkdown from 'react-markdown';
 import axios from 'axios';
-import { Loader2, Play, Code2, AlertTriangle, Lightbulb, Zap, ShieldCheck, CheckCircle2 } from 'lucide-react';
+import { Loader2, Play, Code2, AlertTriangle, Lightbulb, Zap, ShieldCheck, CheckCircle2, Copy, Check, Download } from 'lucide-react';
 
 export default function App() {
   const [code, setCode] = useState('// Paste your code here\n');
@@ -10,6 +10,18 @@ export default function App() {
   const [isReviewing, setIsReviewing] = useState(false);
   const [reviewResult, setReviewResult] = useState(null);
   const [error, setError] = useState(null);
+  const [isCopied, setIsCopied] = useState(false);
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        e.preventDefault();
+        document.getElementById('review-button')?.click();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   const renderString = (val) => {
     if (val === null || val === undefined) return '';
@@ -57,6 +69,54 @@ export default function App() {
     }
   };
 
+  const handleCopy = async () => {
+    if (reviewResult?.improvedCode) {
+      await navigator.clipboard.writeText(renderString(reviewResult.improvedCode));
+      setIsCopied(true);
+      setTimeout(() => setIsCopied(false), 2000);
+    }
+  };
+
+  const handleDownload = () => {
+    if (!reviewResult) return;
+    
+    let markdown = `# AI Code Review Report\n\n`;
+    
+    if (reviewResult.issues?.length > 0) {
+      markdown += `## ⚠️ Potential Issues Found\n`;
+      reviewResult.issues.forEach(issue => markdown += `- ${issue}\n`);
+      markdown += `\n`;
+    }
+    
+    if (reviewResult.suggestions?.length > 0) {
+      markdown += `## 💡 Best Practices & Suggestions\n`;
+      reviewResult.suggestions.forEach(suggestion => markdown += `- ${suggestion}\n`);
+      markdown += `\n`;
+    }
+    
+    if (reviewResult.complexity) {
+      markdown += `## ⚡ Complexity Analysis\n${reviewResult.complexity}\n\n`;
+    }
+    
+    if (reviewResult.explanation) {
+      markdown += `## 🛡️ Explanation\n${reviewResult.explanation}\n\n`;
+    }
+    
+    if (reviewResult.improvedCode) {
+      markdown += `## ✅ Improved Code\n\`\`\`${language}\n${renderString(reviewResult.improvedCode)}\n\`\`\`\n\n`;
+    }
+
+    const blob = new Blob([markdown], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'code-review-report.md';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   const languages = [
     { value: 'javascript', label: 'JavaScript' },
     { value: 'typescript', label: 'TypeScript' },
@@ -91,7 +151,18 @@ export default function App() {
               <option key={lang.value} value={lang.value}>{lang.label}</option>
             ))}
           </select>
+          {reviewResult && (
+            <button
+              onClick={handleDownload}
+              className="flex items-center gap-2 px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium rounded-lg transition-all border border-slate-700"
+              title="Download Report as Markdown"
+            >
+              <Download className="w-4 h-4" />
+              <span className="hidden sm:inline">Export</span>
+            </button>
+          )}
           <button
+            id="review-button"
             onClick={handleReview}
             disabled={isReviewing}
             className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-600/50 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-all shadow-lg shadow-indigo-600/20"
@@ -219,9 +290,18 @@ export default function App() {
               {/* Improved Code */}
               {reviewResult?.improvedCode && (
                 <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl overflow-hidden">
-                  <div className="flex items-center gap-2 px-5 py-3 border-b border-slate-700/50 bg-slate-800/80">
-                    <CheckCircle2 className="w-5 h-5 text-slate-300" />
-                    <h3 className="font-semibold text-slate-200">Improved Code</h3>
+                  <div className="flex items-center justify-between px-5 py-3 border-b border-slate-700/50 bg-slate-800/80">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="w-5 h-5 text-slate-300" />
+                      <h3 className="font-semibold text-slate-200">Improved Code</h3>
+                    </div>
+                    <button
+                      onClick={handleCopy}
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-300 bg-slate-700/50 hover:bg-slate-700 rounded-md transition-colors border border-slate-600/50"
+                    >
+                      {isCopied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                      {isCopied ? 'Copied!' : 'Copy Code'}
+                    </button>
                   </div>
                   <div className="p-5">
                     <div className="rounded-lg overflow-hidden border border-slate-700">
